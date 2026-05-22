@@ -1,0 +1,2013 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>PulseFit - 스마트폰 심박계</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (Inter & Noto Sans KR) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Health Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans KR', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#fff1f2',
+                            100: '#ffe4e6',
+                            500: '#f43f5e',
+                            600: '#e11d48',
+                            700: '#be123c',
+                            900: '#881337',
+                        },
+                        darkBg: '#090d16',
+                        cardBg: '#151c2c',
+                        borderBg: '#1f293d'
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 0.6s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'ping-slow': 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite',
+                        'float': 'float 3s ease-in-out infinite',
+                        'pulse-glow': 'pulseGlow 2s ease-in-out infinite'
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-8px)' },
+                        },
+                        pulseGlow: {
+                            '0%, 100%': { opacity: 0.3, transform: 'scale(0.95)' },
+                            '50%': { opacity: 0.6, transform: 'scale(1.05)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Styles for Mobile App Feeling */
+        body {
+            font-family: 'Inter', 'Noto Sans KR', sans-serif;
+            background-color: #090d16;
+            color: #f3f4f6;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            overflow-x: hidden;
+        }
+        /* Glassmorphism styles */
+        .glass-panel {
+            background: rgba(21, 28, 44, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        /* Custom scrollbar for logs */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        /* Soft shadow */
+        .shadow-neon {
+            box-shadow: 0 0 20px rgba(244, 63, 94, 0.35);
+        }
+        .shadow-neon-green {
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.35);
+        }
+        .shadow-neon-sky {
+            box-shadow: 0 0 20px rgba(14, 165, 233, 0.35);
+        }
+        .shadow-neon-emerald {
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+        }
+    </style>
+</head>
+<body class="flex justify-center items-center min-h-screen p-0 sm:p-4 md:p-8">
+
+    <!-- Mobile Device Container -->
+    <div class="relative w-full max-w-md h-[100vh] sm:h-[840px] sm:rounded-[40px] shadow-2xl overflow-hidden flex flex-col glass-panel border border-gray-800">
+        
+        <!-- Top Status Bar / Header -->
+        <header class="pt-6 px-6 pb-3 flex justify-between items-center z-20 border-b border-gray-800 bg-darkBg/90 backdrop-blur-md">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-xl bg-brand-500 flex items-center justify-center shadow-neon">
+                    <i class="fa-solid fa-heart-pulse text-white text-sm animate-pulse-fast"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-extrabold tracking-tight bg-gradient-to-r from-brand-500 to-rose-400 bg-clip-text text-transparent">PulseFit</h1>
+                    <p class="text-[10px] text-gray-400 font-medium">스마트 헬스 케어</p>
+                </div>
+            </div>
+            
+            <button onclick="openProfileModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-800 hover:bg-gray-700 transition border border-gray-700">
+                <i class="fa-solid fa-user text-xs text-brand-400"></i>
+                <span id="header-user-age" class="text-xs font-semibold text-gray-300">만 28세</span>
+            </button>
+        </header>
+
+        <!-- Main Screen Contents Area -->
+        <main class="flex-1 overflow-y-auto no-scrollbar pb-24">
+            
+            <!-- SECTION 1: DASHBOARD SCREEN -->
+            <section id="screen-dashboard" class="p-6 space-y-6">
+                <!-- Welcome Section -->
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">반가워요, <span id="dashboard-username" class="text-brand-400">사용자</span>님!</h2>
+                        <p class="text-xs text-gray-400 mt-1">오늘의 심장 건강 상태를 체크해 보세요.</p>
+                    </div>
+                    <div id="connection-status" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-semibold">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        센서 작동가능
+                    </div>
+                </div>
+
+                <!-- Last Measurement Status Card -->
+                <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-cardBg to-gray-900 border border-gray-800 p-6 flex items-center justify-between">
+                    <div class="space-y-3 z-10">
+                        <span class="text-xs font-semibold text-brand-400 tracking-wider uppercase px-2 py-1 rounded-md bg-brand-500/10 border border-brand-500/10">최근 측정</span>
+                        <div class="flex items-baseline gap-1">
+                            <span id="last-bpm" class="text-5xl font-extrabold text-white tracking-tight">--</span>
+                            <span class="text-base font-bold text-gray-400">BPM</span>
+                        </div>
+                        <p id="last-status" class="text-xs text-gray-300">측정 기록이 없습니다.</p>
+                        <p id="last-time" class="text-[10px] text-gray-500">지금 바로 첫 측정을 시작해 보세요!</p>
+                    </div>
+                    <div class="relative w-28 h-28 flex items-center justify-center">
+                        <div class="absolute inset-0 bg-brand-500/10 rounded-full animate-ping-slow"></div>
+                        <div class="w-20 h-20 bg-brand-500/20 rounded-full flex items-center justify-center border border-brand-500/30">
+                            <i class="fa-solid fa-heartbeat text-4xl text-brand-500 animate-pulse-fast"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NEW: Real-time Responsive Heart Rate Wave Monitor (ECG Visualizer) -->
+                <div class="rounded-3xl bg-gradient-to-b from-gray-950 to-cardBg border border-gray-800 p-5 space-y-3 relative overflow-hidden">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-sm text-gray-200 flex items-center gap-2">
+                            <span class="relative flex h-2 w-2">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </span>
+                            실시간 동적 ECG 파형 모니터
+                        </h3>
+                        <span id="dashboard-ecg-bpm-badge" class="px-2.5 py-0.5 text-[10px] font-black rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-neon-emerald">-- BPM 연동</span>
+                    </div>
+                    <div class="h-28 w-full bg-black/95 rounded-2xl border border-gray-900 overflow-hidden relative shadow-inner">
+                        <canvas id="dashboard-ecg-canvas" class="w-full h-full block"></canvas>
+                    </div>
+                    <p class="text-[10px] text-gray-400 leading-relaxed">최근 측정된 심박수(또는 기본 72 BPM)에 연동되어 맥박 주기와 수축 속도가 실시간으로 제어되며, 병원 심전도 모니터와 동일한 스위핑 방식으로 렌더링됩니다.</p>
+                </div>
+
+                <!-- Quick Action Grid -->
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="switchTab('measure')" class="p-4 rounded-2xl bg-gradient-to-tr from-rose-950/20 to-cardBg hover:to-gray-800 transition text-left border border-gray-800 hover:border-brand-500/30 group">
+                        <div class="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center text-brand-400 group-hover:scale-110 transition mb-3">
+                            <i class="fa-solid fa-camera text-lg"></i>
+                        </div>
+                        <h3 class="font-bold text-sm text-gray-200">카메라 측정</h3>
+                        <p class="text-[10px] text-gray-500 mt-1">렌즈에 손가락을 대고 간편하게 측정</p>
+                    </button>
+                    <button onclick="switchTab('breathe')" class="p-4 rounded-2xl bg-gradient-to-tr from-sky-950/20 to-cardBg hover:to-gray-800 transition text-left border border-gray-800 hover:border-sky-500/30 group">
+                        <div class="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center text-sky-400 group-hover:scale-110 transition mb-3">
+                            <i class="fa-solid fa-wind text-lg"></i>
+                        </div>
+                        <h3 class="font-bold text-sm text-gray-200">호흡 페이서</h3>
+                        <p class="text-[10px] text-gray-500 mt-1">안정 상태 유도를 위한 박스 브리딩</p>
+                    </button>
+                </div>
+
+                <!-- Live Heart Rate Zones Analysis Card -->
+                <div class="rounded-3xl bg-cardBg border border-gray-800 p-5 space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-sm text-gray-200 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-brand-400"></i>
+                            나의 건강 맞춤 심박 영역
+                        </h3>
+                        <button onclick="openProfileModal()" class="text-[11px] text-brand-400 hover:underline">나이 변경</button>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <div id="zones-list" class="space-y-2.5 text-xs">
+                            <!-- JS calculated dynamic zones will load here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Statistics Summary Widget -->
+                <div class="rounded-3xl bg-cardBg border border-gray-800 p-5">
+                    <h3 class="font-bold text-sm text-gray-200 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-history text-indigo-400"></i>
+                        최근 7회 트렌드
+                    </h3>
+                    <div class="h-32 w-full flex items-end justify-between px-2 pt-4 relative">
+                        <!-- Canvas for trend line chart -->
+                        <canvas id="dashboard-trend-canvas" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+                        <div id="chart-no-data" class="absolute inset-0 flex flex-col items-center justify-center text-gray-500 text-xs gap-1">
+                            <i class="fa-solid fa-folder-open text-lg"></i>
+                            측정 데이터가 없습니다
+                        </div>
+                    </div>
+                    <div class="flex justify-between text-[10px] text-gray-500 mt-2 px-1">
+                        <span>과거</span>
+                        <span>최근</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 2: MEASURE SCREEN (PPG Sensor + Tap) -->
+            <section id="screen-measure" class="p-6 space-y-6 hidden">
+                <div class="text-center space-y-1">
+                    <h2 class="text-xl font-bold text-white">심박수 측정</h2>
+                    <p class="text-xs text-gray-400">편리한 방법으로 심장 박동수를 측정하세요.</p>
+                </div>
+
+                <!-- Method Switcher Tab -->
+                <div class="flex p-1 rounded-xl bg-gray-900 border border-gray-800">
+                    <button onclick="setMeasureMethod('ppg')" id="btn-method-ppg" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-300 bg-brand-500 text-white shadow-md">
+                        <i class="fa-solid fa-camera mr-1"></i>카메라 센서
+                    </button>
+                    <button onclick="setMeasureMethod('tap')" id="btn-method-tap" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-300 text-gray-400 hover:text-white">
+                        <i class="fa-solid fa-fingerprint mr-1"></i>수동 화면 탭
+                    </button>
+                </div>
+
+                <!-- CAMERA PPG SENSOR SECTION -->
+                <div id="measure-ppg-container" class="space-y-6">
+                    <!-- Sensor Circle / Circular Wave -->
+                    <div class="relative w-64 h-64 mx-auto flex items-center justify-center">
+                        <!-- Outer ripple effects -->
+                        <div id="ppg-ripple-1" class="absolute inset-0 rounded-full border border-brand-500/20 scale-100 opacity-0 transition duration-1000"></div>
+                        <div id="ppg-ripple-2" class="absolute inset-4 rounded-full border border-brand-500/10 scale-100 opacity-0 transition duration-1000"></div>
+                        
+                        <!-- Video preview container (Highly styled and cropped) -->
+                        <div class="absolute w-44 h-44 rounded-full overflow-hidden border-4 border-gray-800 bg-black flex items-center justify-center shadow-inner">
+                            <video id="webcam-video" autoplay playsinline muted class="object-cover w-full h-full scale-150 brightness-150 contrast-125 opacity-20 transition-opacity duration-500"></video>
+                            
+                            <!-- Simulation overlay badge (Hidden by default, shown during demo mode) -->
+                            <div id="simulation-overlay-badge" class="absolute inset-0 bg-gradient-to-br from-indigo-950/95 to-slate-900/95 hidden flex flex-col items-center justify-center text-center p-3 z-10">
+                                <i class="fa-solid fa-wand-magic-sparkles text-sky-400 text-2xl mb-1.5 animate-bounce"></i>
+                                <span class="text-[10px] font-bold text-sky-300 tracking-wide uppercase">시뮬레이션 모드</span>
+                                <span class="text-[8px] text-gray-400 mt-0.5">실제 신호 수식 분석 진행</span>
+                            </div>
+
+                            <!-- Overlay UI elements over lens -->
+                            <div class="absolute inset-0 bg-gradient-to-t from-darkBg via-transparent to-transparent"></div>
+                            <div id="ppg-pulse-circle" class="absolute w-20 h-20 rounded-full bg-brand-500/30 border border-brand-500 flex flex-col items-center justify-center transition-all duration-300">
+                                <i class="fa-solid fa-heart text-white text-3xl animate-pulse-fast"></i>
+                            </div>
+                        </div>
+
+                        <!-- Progress Circle Ring around the sensor -->
+                        <svg class="absolute w-52 h-52 transform -rotate-90">
+                            <circle cx="104" cy="104" r="98" stroke="rgba(31, 41, 55, 0.4)" stroke-width="6" fill="transparent" />
+                            <circle id="ppg-progress-ring" cx="104" cy="104" r="98" stroke="#f43f5e" stroke-width="6" fill="transparent" stroke-dasharray="615.7" stroke-dashoffset="615.7" stroke-linecap="round" class="transition-all duration-200" />
+                        </svg>
+                    </div>
+
+                    <!-- PPG Waveform Live Canvas -->
+                    <div class="rounded-2xl bg-black border border-gray-800 p-3 h-20 relative overflow-hidden">
+                        <canvas id="ppg-canvas" class="w-full h-full"></canvas>
+                        <div id="ppg-sensor-warning" class="absolute inset-0 flex items-center justify-center bg-black/95 text-rose-400 text-[11px] font-bold gap-1.5 px-4 text-center">
+                            <i class="fa-solid fa-circle-info text-xs"></i>
+                            카메라 렌즈 전체를 검지 손가락 끝으로 가볍게 덮어주세요.
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Metrics Block -->
+                    <div class="grid grid-cols-2 gap-4 text-center">
+                        <div class="p-4 rounded-2xl bg-cardBg border border-gray-800">
+                            <p class="text-[11px] text-gray-500 font-semibold uppercase">추정 심박수</p>
+                            <div class="flex items-baseline justify-center gap-0.5 mt-1">
+                                <span id="ppg-live-bpm" class="text-3xl font-extrabold text-white">--</span>
+                                <span class="text-xs font-bold text-gray-500">BPM</span>
+                            </div>
+                        </div>
+                        <div class="p-4 rounded-2xl bg-cardBg border border-gray-800">
+                            <p class="text-[11px] text-gray-500 font-semibold uppercase">신호 상태</p>
+                            <div class="flex items-center justify-center gap-1.5 mt-2">
+                                <span id="ppg-signal-indicator" class="w-2.5 h-2.5 rounded-full bg-gray-600"></span>
+                                <span id="ppg-signal-text" class="text-xs font-bold text-gray-300">센서 비활성</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Control Buttons -->
+                    <div class="flex flex-col gap-2">
+                        <div class="flex gap-3">
+                            <button id="btn-start-ppg" onclick="startPPGMeasurement()" class="flex-1 py-4 px-6 rounded-2xl bg-brand-500 hover:bg-brand-600 font-bold text-sm text-white shadow-neon transition flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-play"></i>
+                                측정 시작하기
+                            </button>
+                            <button id="btn-stop-ppg" onclick="stopPPGMeasurement(false)" class="hidden flex-1 py-4 px-6 rounded-2xl bg-gray-800 hover:bg-gray-700 font-bold text-sm text-gray-200 border border-gray-700 transition flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-stop"></i>
+                                중단하기
+                            </button>
+                        </div>
+                        <button type="button" onclick="showSimulationModeChoice()" class="py-2.5 text-xs text-gray-400 hover:text-white bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 rounded-xl transition flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-wand-magic-sparkles text-sky-400"></i>
+                            카메라 없이 가상 시뮬레이션으로 체험
+                        </button>
+                    </div>
+                </div>
+
+                <!-- MANUAL TAP PULSE MEASUREMENT SECTION -->
+                <div id="measure-tap-container" class="space-y-6 hidden">
+                    <div class="text-center p-3 rounded-xl bg-blue-500/10 border border-blue-500/15 text-blue-400 text-xs">
+                        맥박이 뛸 때마다 아래 영역을 리드미컬하게 터치해 주세요.
+                    </div>
+
+                    <!-- Big Pulse Tap Pad -->
+                    <div id="tap-pad" class="w-60 h-60 mx-auto rounded-full bg-gradient-to-tr from-indigo-950/40 via-cardBg to-indigo-950/30 border border-indigo-500/20 shadow-lg flex flex-col items-center justify-center cursor-pointer select-none active:scale-95 transition duration-150 group relative">
+                        <div class="absolute inset-4 rounded-full border border-indigo-500/10 group-hover:scale-105 transition duration-500"></div>
+                        <i class="fa-solid fa-fingerprint text-5xl text-indigo-400 group-active:text-brand-400 transition mb-3"></i>
+                        <span class="text-xs font-semibold text-gray-400 group-active:text-white">맥박에 맞춰 터치</span>
+                        <span id="tap-count-label" class="text-[10px] text-indigo-500 mt-1 uppercase font-bold tracking-wider">0회 터치됨</span>
+                    </div>
+
+                    <!-- Realtime calculations -->
+                    <div class="grid grid-cols-2 gap-4 text-center">
+                        <div class="p-4 rounded-2xl bg-cardBg border border-gray-800">
+                            <p class="text-[11px] text-gray-500 font-semibold uppercase">수동 계산 심박수</p>
+                            <div class="flex items-baseline justify-center gap-0.5 mt-1">
+                                <span id="tap-calculated-bpm" class="text-3xl font-extrabold text-indigo-400">--</span>
+                                <span class="text-xs font-bold text-gray-500">BPM</span>
+                            </div>
+                        </div>
+                        <div class="p-4 rounded-2xl bg-cardBg border border-gray-800 flex flex-col justify-center items-center">
+                            <button id="btn-save-tap" onclick="saveTapMeasurement()" disabled class="w-full h-full py-2.5 px-4 rounded-xl bg-indigo-600 disabled:bg-gray-800 disabled:text-gray-500 text-white text-xs font-bold transition">
+                                <i class="fa-solid fa-cloud-arrow-up mr-1"></i>기록에 저장
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 3: BREATHE SCREEN (MINDFULNESS PACER) -->
+            <section id="screen-breathe" class="p-6 space-y-6 hidden">
+                <div class="text-center space-y-1">
+                    <h2 class="text-xl font-bold text-white">마음안정 호흡 가이드</h2>
+                    <p class="text-xs text-gray-400">호흡 훈련을 통해 심박을 조절하고 안정을 누려보세요.</p>
+                </div>
+
+                <!-- Breath Presets -->
+                <div class="grid grid-cols-3 gap-2.5">
+                    <button onclick="setBreathPreset('box')" id="btn-breath-box" class="py-2.5 px-2 rounded-xl text-xs font-bold bg-sky-500 text-white transition">
+                        박스 브리딩
+                    </button>
+                    <button onclick="setBreathPreset('calm')" id="btn-breath-calm" class="py-2.5 px-2 rounded-xl text-xs font-bold bg-gray-800 text-gray-400 hover:text-white transition">
+                        4-7-8 수면
+                    </button>
+                    <button onclick="setBreathPreset('equal')" id="btn-breath-equal" class="py-2.5 px-2 rounded-xl text-xs font-bold bg-gray-800 text-gray-400 hover:text-white transition">
+                        균등 호흡
+                    </button>
+                </div>
+
+                <!-- Animated Breath visualizer container -->
+                <div class="relative w-64 h-64 mx-auto flex items-center justify-center">
+                    <!-- Expanding / Contracting circle -->
+                    <div id="breath-circle" class="w-36 h-36 rounded-full bg-gradient-to-tr from-sky-500/40 via-sky-400/20 to-teal-500/10 border-2 border-sky-400 shadow-neon-green flex flex-col items-center justify-center transition-all duration-[4000ms] cubic-bezier(0.4, 0, 0.2, 1)">
+                        <span id="breath-text" class="text-base font-extrabold text-white tracking-wider">시작 대기</span>
+                        <span id="breath-timer" class="text-xs font-bold text-sky-200 mt-1">-- 초</span>
+                    </div>
+                </div>
+
+                <!-- Preset Description Card -->
+                <div class="p-4 rounded-2xl bg-cardBg border border-gray-800 space-y-1 text-center">
+                    <h4 id="breath-preset-title" class="font-bold text-sm text-sky-400">박스 브리딩 (Box Breathing)</h4>
+                    <p id="breath-preset-desc" class="text-xs text-gray-400">특수 부대나 위기 극복 훈련에서 집중력 향상과 부교감 신경 활성화를 위해 활용하는 네 단계 주기 호흡 기법입니다.</p>
+                </div>
+
+                <!-- Controller button -->
+                <button id="btn-breath-control" onclick="toggleBreathTrainer()" class="w-full py-4 rounded-2xl bg-sky-500 hover:bg-sky-600 font-bold text-sm text-white transition shadow-lg flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-play"></i>
+                    호흡 운동 시작하기
+                </button>
+            </section>
+
+            <!-- SECTION 4: HEALTH INSIGHTS -->
+            <section id="screen-insights" class="p-6 space-y-6 hidden">
+                <div class="text-center space-y-1">
+                    <h2 class="text-xl font-bold text-white">건강 인사이트</h2>
+                    <p class="text-xs text-gray-400">나의 맞춤 심혈관 분석 정보와 건강 꿀팁입니다.</p>
+                </div>
+
+                <!-- User age based calculations card -->
+                <div class="rounded-3xl bg-gradient-to-br from-purple-950/20 to-cardBg border border-purple-900/30 p-5 space-y-3">
+                    <div class="flex items-center gap-2 text-purple-400">
+                        <i class="fa-solid fa-calculator"></i>
+                        <span class="font-extrabold text-xs tracking-wider uppercase">연령 맞춤 지표 계산기</span>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs text-gray-300">
+                            <span>추정 최대 심박수 (HR Max)</span>
+                            <span id="insights-hrmax" class="font-bold text-white">192 BPM</span>
+                        </div>
+                        <div class="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-gradient-to-r from-teal-400 via-yellow-400 to-rose-500 h-full w-[90%]"></div>
+                        </div>
+                        <p class="text-[11px] text-gray-400">일반적인 의학 공식(220 - 나이)으로 계산된 기준 최대치입니다. 무산소 또는 고강도 훈련 중 해당 수치 도달에 각별히 유의하세요.</p>
+                    </div>
+                </div>
+
+                <!-- Health Tips Feed -->
+                <div class="space-y-4">
+                    <h3 class="font-bold text-sm text-gray-200">알아두면 유익한 심장 건강 상식</h3>
+                    
+                    <div class="p-4 rounded-2xl bg-cardBg border border-gray-800 space-y-2">
+                        <div class="flex items-center gap-2 text-rose-400">
+                            <i class="fa-solid fa-heart-pulse"></i>
+                            <h4 class="font-bold text-xs">올바른 안정시 심박수 측정 방법</h4>
+                        </div>
+                        <p class="text-xs text-gray-400 leading-relaxed">아침에 눈을 뜬 직후, 침대에서 일어나기 전에 측정하는 심박수가 가장 정확한 안정시 심박수(Resting HR)입니다. 성인 기준 60 ~ 100 BPM이 정상 범위로 여겨지며, 마라토너 등 훈련된 운동선수는 40 ~ 50 BPM까지 내려갈 수 있습니다.</p>
+                    </div>
+
+                    <div class="p-4 rounded-2xl bg-cardBg border border-gray-800 space-y-2">
+                        <div class="flex items-center gap-2 text-emerald-400">
+                            <i class="fa-solid fa-shield-heart"></i>
+                            <h4 class="font-bold text-xs">심박 변이도 (HRV)란 무엇인가요?</h4>
+                        </div>
+                        <p class="text-xs text-gray-400 leading-relaxed">심박 변이도는 심장 박동 간격 간의 미세한 변화(밀리초 단위)를 말합니다. 일정한 간격보다 오히려 불규칙적으로 유연하게 반응하는 상태(높은 HRV)가 자율신경계가 건강하고 스트레스 지수가 낮음을 시사합니다.</p>
+                    </div>
+
+                    <div class="p-4 rounded-2xl bg-cardBg border border-gray-800 space-y-2">
+                        <div class="flex items-center gap-2 text-amber-400">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            <h4 class="font-bold text-xs">비정상적인 심박수 경고 신호</h4>
+                        </div>
+                        <p class="text-xs text-gray-400 leading-relaxed">특별한 신체적 활동이나 열감이 없는데도 안정 시 심박수가 수일 이상 지속적으로 100 BPM을 상회하거나(빈맥), 60 BPM 미만(서맥)이면서 어지러움, 호흡 곤란을 동반할 경우에는 전문의의 정밀 심전도 검사(ECG) 진료를 권장합니다.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 5: HISTORICAL DATA LOGS -->
+            <section id="screen-history" class="p-6 space-y-6 hidden">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">측정 역사 기록</h2>
+                        <p class="text-xs text-gray-400">과거의 소중한 심박 측정 모니터링 로그입니다.</p>
+                    </div>
+                    <button onclick="clearAllHistory()" class="px-2.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold transition">
+                        전체 삭제
+                    </button>
+                </div>
+
+                <!-- Log Filter Tabs -->
+                <div class="flex p-1 rounded-xl bg-gray-900 border border-gray-800 text-xs">
+                    <button onclick="filterLogs('all')" id="btn-filter-all" class="flex-1 py-1.5 rounded-lg font-bold bg-gray-800 text-white transition">전체</button>
+                    <button onclick="filterLogs('resting')" id="btn-filter-resting" class="flex-1 py-1.5 rounded-lg font-bold text-gray-400 hover:text-white transition">안정기</button>
+                    <button onclick="filterLogs('active')" id="btn-filter-active" class="flex-1 py-1.5 rounded-lg font-bold text-gray-400 hover:text-white transition">운동직후</button>
+                </div>
+
+                <!-- Custom Interactive Bar Graph of History -->
+                <div class="p-4 rounded-2xl bg-cardBg border border-gray-800">
+                    <h4 class="text-xs font-bold text-gray-400 mb-3 uppercase">주 단위 분포 통계</h4>
+                    <div id="history-chart-fallback" class="h-32 flex items-center justify-center text-xs text-gray-500">
+                        통계를 시각화하려면 심박 데이터를 추가해 주세요.
+                    </div>
+                    <canvas id="history-bar-canvas" class="w-full h-32 hidden"></canvas>
+                </div>
+
+                <!-- Logs List Wrapper -->
+                <div class="space-y-3">
+                    <h3 class="font-bold text-sm text-gray-200">상세 로그 목록</h3>
+                    <div id="logs-container" class="space-y-3">
+                        <!-- Simulated / Real Logs loaded from localStorage dynamically -->
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Bottom Tab Navigation Bar -->
+        <nav class="absolute bottom-0 left-0 right-0 z-30 flex justify-around items-center h-16 bg-cardBg/90 backdrop-blur-lg border-t border-gray-800 pb-safe-bottom">
+            <button onclick="switchTab('dashboard')" id="nav-dashboard" class="flex flex-col items-center justify-center flex-1 h-full text-brand-500 transition duration-200">
+                <i class="fa-solid fa-chart-pie text-lg"></i>
+                <span class="text-[10px] font-bold mt-1">대시보드</span>
+            </button>
+            <button onclick="switchTab('measure')" id="nav-measure" class="flex flex-col items-center justify-center flex-1 h-full text-gray-400 hover:text-gray-200 transition duration-200">
+                <i class="fa-solid fa-heart-pulse text-lg"></i>
+                <span class="text-[10px] font-bold mt-1">심박 측정</span>
+            </button>
+            <button onclick="switchTab('breathe')" id="nav-breathe" class="flex flex-col items-center justify-center flex-1 h-full text-gray-400 hover:text-gray-200 transition duration-200">
+                <i class="fa-solid fa-wind text-lg"></i>
+                <span class="text-[10px] font-bold mt-1">호흡 조절</span>
+            </button>
+            <button onclick="switchTab('insights')" id="nav-insights" class="flex flex-col items-center justify-center flex-1 h-full text-gray-400 hover:text-gray-200 transition duration-200">
+                <i class="fa-solid fa-user-doctor text-lg"></i>
+                <span class="text-[10px] font-bold mt-1">인사이트</span>
+            </button>
+            <button onclick="switchTab('history')" id="nav-history" class="flex flex-col items-center justify-center flex-1 h-full text-gray-400 hover:text-gray-200 transition duration-200">
+                <i class="fa-solid fa-clock-rotate-left text-lg"></i>
+                <span class="text-[10px] font-bold mt-1">기록</span>
+            </button>
+        </nav>
+
+    </div>
+
+    <!-- OVERLAY: PROFILE EDIT MODAL -->
+    <div id="profile-modal" class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 hidden backdrop-blur-sm">
+        <div class="bg-cardBg border border-gray-800 w-full max-w-sm rounded-3xl p-6 space-y-4">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h3 class="text-lg font-bold text-white">건강 프로필 설정</h3>
+                    <p class="text-xs text-gray-400">맞춤형 건강 심박 기준 영역 계산에 사용됩니다.</p>
+                </div>
+                <button onclick="closeProfileModal()" class="w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-400 transition">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3.5">
+                <div>
+                    <label class="block text-xs text-gray-400 font-bold mb-1">사용자 성함</label>
+                    <input type="text" id="input-username" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-500" placeholder="성함 입력">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 font-bold mb-1">사용자 나이 (만 연령)</label>
+                    <input type="number" id="input-userage" class="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-500" placeholder="나이 입력 (예: 28)">
+                </div>
+            </div>
+
+            <button onclick="saveUserProfile()" class="w-full py-3.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm transition">
+                설정 저장 및 업데이트
+            </button>
+        </div>
+    </div>
+
+    <!-- OVERLAY: NOTIFICATION TOAST BOX -->
+    <div id="toast" class="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50 py-3 px-5 rounded-xl text-xs font-bold bg-gray-900 border border-gray-800 shadow-xl flex items-center gap-2 text-white scale-90 opacity-0 transition-all duration-300 pointer-events-none">
+        <i id="toast-icon" class="fa-solid fa-circle-check text-brand-400"></i>
+        <span id="toast-message">알림 메시지</span>
+    </div>
+
+    <!-- OVERLAY: MEASUREMENT SAVE MODAL -->
+    <div id="save-modal" class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 hidden backdrop-blur-sm">
+        <div class="bg-cardBg border border-gray-800 w-full max-w-sm rounded-3xl p-6 space-y-4">
+            <div class="text-center space-y-1">
+                <h3 class="text-lg font-bold text-white">측정 완료!</h3>
+                <p class="text-xs text-gray-400">어떤 상태에서 측정하셨는지 아래의 태그를 지정해 주세요.</p>
+            </div>
+
+            <div class="flex justify-center items-baseline gap-1 py-4">
+                <span id="save-modal-bpm" class="text-6xl font-extrabold text-brand-500">82</span>
+                <span class="text-lg font-bold text-gray-400">BPM</span>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs text-gray-400 font-bold mb-2 text-center">현재 측정 환경 / 태그</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="setSelectedTag('resting')" id="tag-btn-resting" class="py-2.5 rounded-xl text-xs font-semibold bg-brand-500 text-white border border-brand-500/20 transition">
+                            <i class="fa-solid fa-bed mr-1"></i>안정시 (휴식)
+                        </button>
+                        <button onclick="setSelectedTag('active')" id="tag-btn-active" class="py-2.5 rounded-xl text-xs font-semibold bg-gray-800 text-gray-400 border border-gray-800 hover:text-white transition">
+                            <i class="fa-solid fa-person-running mr-1"></i>운동 직후
+                        </button>
+                        <button onclick="setSelectedTag('excited')" id="tag-btn-excited" class="py-2.5 rounded-xl text-xs font-semibold bg-gray-800 text-gray-400 border border-gray-800 hover:text-white transition">
+                            <i class="fa-solid fa-bolt mr-1"></i>흥분 / 스트레스
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pt-2 flex gap-3">
+                    <button onclick="closeSaveModal()" class="flex-1 py-3 rounded-xl bg-gray-800 text-gray-300 text-xs font-bold hover:bg-gray-700 transition">취소</button>
+                    <button onclick="submitMeasurementLog()" class="flex-1 py-3 rounded-xl bg-brand-500 text-white text-xs font-bold hover:bg-brand-600 transition shadow-neon">저장 완료</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERLAY: CAMERA ACCESS FALLBACK MODAL -->
+    <div id="camera-error-modal" class="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 hidden backdrop-blur-sm">
+        <div class="bg-cardBg border border-gray-800 w-full max-w-sm rounded-3xl p-6 space-y-4 shadow-neon">
+            <div class="text-center space-y-2">
+                <div class="w-12 h-12 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto text-xl animate-bounce">
+                    <i class="fa-solid fa-video-slash"></i>
+                </div>
+                <h3 class="text-lg font-bold text-white">카메라 연결 제한됨</h3>
+                <p class="text-xs text-gray-400 leading-relaxed">
+                    브라우저 보안 권한 제한, 다른 응용프로그램의 카메라 점유 또는 웹캠 하드웨어 부재로 카메라 구동이 어렵습니다. 아래 대안 수단으로 안전하게 체험하세요!
+                </p>
+            </div>
+
+            <div class="space-y-2.5 pt-2">
+                <button onclick="startSimulationPPG()" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white font-bold text-xs transition shadow-neon-sky flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    가상 심박 시뮬레이션 측정 (즉시 감상)
+                </button>
+                <button onclick="switchToTapMode()" class="w-full py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold text-xs transition flex items-center justify-center gap-2 border border-gray-700">
+                    <i class="fa-solid fa-fingerprint text-indigo-400"></i>
+                    화면 수동 탭(손가락 터치)으로 측정 변경
+                </button>
+                <button onclick="closeCameraErrorModal()" class="w-full py-2.5 rounded-xl text-gray-500 hover:text-gray-400 text-[11px] font-semibold transition text-center">
+                    닫기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* -----------------------
+           APPLICATION STATE & VARIABLES 
+           ----------------------- */
+        let state = {
+            currentTab: 'dashboard',
+            measureMethod: 'ppg', // 'ppg' or 'tap'
+            user: {
+                name: '건강지킴이',
+                age: 28
+            },
+            history: [],
+            // Camera Sensor PPG Processing Properties
+            isPPGMeasuring: false,
+            isSimulationMode: false, // Flag for virtual fallback
+            videoStream: null,
+            ppgAnimationId: null,
+            rollingRedBuffer: [],
+            rollingBPMBuffer: [],
+            lastPeakTime: 0,
+            ppgProgress: 0,
+            ppgDuration: 15000, // 15 seconds to finish measurement
+            ppgStartTime: 0,
+            detectedBPM: 0,
+            // Manual Tap properties
+            tapTimestamps: [],
+            tapBPM: 0,
+            // Breathing Presets
+            breathPreset: 'box', // 'box', 'calm', 'equal'
+            breathState: 'idle', // 'idle', 'inhale', 'hold1', 'exhale', 'hold2'
+            breathInterval: null,
+            breathTimerVal: 0,
+            selectedSaveTag: 'resting',
+            tempMeasuredBPM: 0,
+            // Live ECG Dashboard Monitor Variables
+            ecgAnimationId: null,
+            ecgPhase: 0,
+            ecgSweepX: 0,
+            ecgPoints: [] // Holds buffered points for sweep visualization
+        };
+
+        // DOM elements cache
+        const el = {
+            screens: {
+                dashboard: document.getElementById('screen-dashboard'),
+                measure: document.getElementById('screen-measure'),
+                breathe: document.getElementById('screen-breathe'),
+                insights: document.getElementById('screen-insights'),
+                history: document.getElementById('screen-history')
+            },
+            navs: {
+                dashboard: document.getElementById('nav-dashboard'),
+                measure: document.getElementById('nav-measure'),
+                breathe: document.getElementById('nav-breathe'),
+                insights: document.getElementById('nav-insights'),
+                history: document.getElementById('nav-history')
+            },
+            video: document.getElementById('webcam-video'),
+            ppgCanvas: document.getElementById('ppg-canvas'),
+            ppgWarning: document.getElementById('ppg-sensor-warning'),
+            ppgProgressRing: document.getElementById('ppg-progress-ring'),
+            ppgLiveBPM: document.getElementById('ppg-live-bpm'),
+            ppgSignalText: document.getElementById('ppg-signal-text'),
+            ppgSignalIndicator: document.getElementById('ppg-signal-indicator'),
+            ppgBtnStart: document.getElementById('btn-start-ppg'),
+            ppgBtnStop: document.getElementById('btn-stop-ppg'),
+            ppgRipple1: document.getElementById('ppg-ripple-1'),
+            ppgRipple2: document.getElementById('ppg-ripple-2'),
+            ppgPulseCircle: document.getElementById('ppg-pulse-circle'),
+            tapPad: document.getElementById('tap-pad'),
+            tapCountLabel: document.getElementById('tap-count-label'),
+            tapCalculatedBPM: document.getElementById('tap-calculated-bpm'),
+            tapBtnSave: document.getElementById('btn-save-tap'),
+            btnMethodPPG: document.getElementById('btn-method-ppg'),
+            btnMethodTap: document.getElementById('btn-method-tap'),
+            measurePPGContainer: document.getElementById('measure-ppg-container'),
+            measureTapContainer: document.getElementById('measure-tap-container'),
+            profileModal: document.getElementById('profile-modal'),
+            saveModal: document.getElementById('save-modal'),
+            cameraErrorModal: document.getElementById('camera-error-modal'),
+            simulationOverlayBadge: document.getElementById('simulation-overlay-badge'),
+            toast: document.getElementById('toast'),
+            toastIcon: document.getElementById('toast-icon'),
+            toastMessage: document.getElementById('toast-message'),
+            zonesList: document.getElementById('zones-list'),
+            logsContainer: document.getElementById('logs-container'),
+            // New Dashboard ECG Canvas
+            dashboardEcgCanvas: document.getElementById('dashboard-ecg-canvas')
+        };
+
+        // Audio Context for sound synthesis (heartbeats & mindfulness breath ticks)
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playBeep(frequency, duration, type = 'sine') {
+            try {
+                initAudio();
+                if (!audioCtx) return;
+                let osc = audioCtx.createOscillator();
+                let gainNode = audioCtx.createGain();
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                osc.type = type;
+                osc.frequency.value = frequency;
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                
+                osc.start(audioCtx.currentTime);
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {
+                console.warn('Audio play failed', e);
+            }
+        }
+
+        // Simulates a heavy low frequency "thump-thump" heartbeat
+        function playHeartbeatSound() {
+            playBeep(85, 0.1, 'sine');
+            setTimeout(() => {
+                playBeep(70, 0.15, 'sine');
+            }, 120);
+        }
+
+        /* -----------------------
+           LOCALSTORAGE & USER PROFILE
+           ----------------------- */
+        function initLocalStorage() {
+            const savedUser = localStorage.getItem('pulse_user');
+            if (savedUser) {
+                state.user = JSON.parse(savedUser);
+            } else {
+                localStorage.setItem('pulse_user', JSON.stringify(state.user));
+            }
+
+            const savedHistory = localStorage.getItem('pulse_history');
+            if (savedHistory) {
+                state.history = JSON.parse(savedHistory);
+            } else {
+                // Populate demo mock data initially for visualization
+                const mockHistory = [
+                    { id: 1, bpm: 72, tag: 'resting', date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString() },
+                    { id: 2, bpm: 110, tag: 'active', date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString() },
+                    { id: 3, bpm: 68, tag: 'resting', date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString() },
+                    { id: 4, bpm: 95, tag: 'excited', date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() },
+                    { id: 5, bpm: 125, tag: 'active', date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() },
+                    { id: 6, bpm: 75, tag: 'resting', date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() }
+                ];
+                state.history = mockHistory;
+                localStorage.setItem('pulse_history', JSON.stringify(mockHistory));
+            }
+            updateProfileUI();
+            updateHistoryUI();
+            renderDashboard();
+            startDashboardECG(); // Start the dynamic sweeping ECG loop
+        }
+
+        function showToast(message, isSuccess = true) {
+            el.toastMessage.textContent = message;
+            if (isSuccess) {
+                el.toastIcon.className = "fa-solid fa-circle-check text-emerald-400";
+            } else {
+                el.toastIcon.className = "fa-solid fa-circle-exclamation text-rose-500";
+            }
+            el.toast.classList.remove('scale-90', 'opacity-0');
+            el.toast.classList.add('scale-100', 'opacity-100');
+            setTimeout(() => {
+                el.toast.classList.add('scale-90', 'opacity-0');
+                el.toast.classList.remove('scale-100', 'opacity-100');
+            }, 3000);
+        }
+
+        function switchTab(tabId) {
+            if (state.currentTab === 'measure' && tabId !== 'measure') {
+                stopPPGMeasurement(false);
+            }
+            if (state.currentTab === 'breathe' && tabId !== 'breathe') {
+                stopBreathTrainer();
+            }
+
+            state.currentTab = tabId;
+
+            // Update UI container display
+            Object.keys(el.screens).forEach(key => {
+                if (key === tabId) {
+                    el.screens[key].classList.remove('hidden');
+                } else {
+                    el.screens[key].classList.add('hidden');
+                }
+            });
+
+            // Update Nav styling
+            Object.keys(el.navs).forEach(key => {
+                if (key === tabId) {
+                    el.navs[key].className = "flex flex-col items-center justify-center flex-1 h-full text-brand-500 transition duration-200";
+                } else {
+                    el.navs[key].className = "flex flex-col items-center justify-center flex-1 h-full text-gray-400 hover:text-gray-200 transition duration-200";
+                }
+            });
+
+            // Trigger rendering hooks
+            if (tabId === 'dashboard') {
+                renderDashboard();
+            } else if (tabId === 'history') {
+                updateHistoryUI();
+            } else if (tabId === 'insights') {
+                renderInsights();
+            }
+        }
+
+        function openProfileModal() {
+            document.getElementById('input-username').value = state.user.name;
+            document.getElementById('input-userage').value = state.user.age;
+            el.profileModal.classList.remove('hidden');
+        }
+
+        function closeProfileModal() {
+            el.profileModal.classList.add('hidden');
+        }
+
+        function saveUserProfile() {
+            const name = document.getElementById('input-username').value.trim();
+            const age = parseInt(document.getElementById('input-userage').value);
+
+            if (!name || isNaN(age) || age <= 0 || age > 130) {
+                showToast("올바른 성함과 나이를 입력해 주세요.", false);
+                return;
+            }
+
+            state.user.name = name;
+            state.user.age = age;
+            localStorage.setItem('pulse_user', JSON.stringify(state.user));
+            
+            updateProfileUI();
+            renderDashboard();
+            renderInsights();
+            closeProfileModal();
+            showToast("건강 프로필이 업데이트되었습니다.");
+        }
+
+        function updateProfileUI() {
+            document.getElementById('header-user-age').textContent = `만 ${state.user.age}세`;
+            document.getElementById('dashboard-username').textContent = state.user.name;
+        }
+
+        /* -----------------------
+           DASHBOARD CONTROLLERS & CHARTS
+           ----------------------- */
+        function calculateHeartZones(age) {
+            const maxHR = 220 - age;
+            return [
+                { name: '안정 & 회복 (Warm-Up)', pct: '50-60%', min: Math.round(maxHR * 0.5), max: Math.round(maxHR * 0.6), color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+                { name: '지방 연소 (Fat Burn)', pct: '60-70%', min: Math.round(maxHR * 0.6), max: Math.round(maxHR * 0.7), color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
+                { name: '유산소 건강 (Cardio)', pct: '70-85%', min: Math.round(maxHR * 0.7), max: Math.round(maxHR * 0.85), color: 'text-orange-400', bg: 'bg-orange-500/10' },
+                { name: '최대 운동 상태 (Peak)', pct: '85%+', min: Math.round(maxHR * 0.85), max: maxHR, color: 'text-rose-500', bg: 'bg-rose-500/10' }
+            ];
+        }
+
+        function renderDashboard() {
+            let targetBPM = 72;
+            if (state.history.length > 0) {
+                const last = state.history[state.history.length - 1];
+                document.getElementById('last-bpm').textContent = last.bpm;
+                targetBPM = last.bpm;
+                
+                let tagTxt = "안정시 심박수";
+                if (last.tag === 'active') tagTxt = "운동 직후 심박수";
+                if (last.tag === 'excited') tagTxt = "흥분 / 스트레스 상태";
+
+                document.getElementById('last-status').textContent = `${tagTxt} • 상태 양호`;
+                document.getElementById('last-time').textContent = new Date(last.date).toLocaleString('ko-KR', {
+                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                });
+            } else {
+                document.getElementById('last-bpm').textContent = '--';
+                document.getElementById('last-status').textContent = '측정 기록이 없습니다.';
+                document.getElementById('last-time').textContent = '지금 바로 첫 측정을 시작해 보세요!';
+            }
+
+            document.getElementById('dashboard-ecg-bpm-badge').textContent = `${targetBPM} BPM 연동`;
+
+            const zones = calculateHeartZones(state.user.age);
+            el.zonesList.innerHTML = zones.map(zone => `
+                <div class="flex items-center justify-between p-2.5 rounded-xl ${zone.bg} border border-white/5">
+                    <div class="space-y-0.5">
+                        <span class="font-extrabold ${zone.color}">${zone.name}</span>
+                        <p class="text-[10px] text-gray-400">최대치 기준 분당 심박 ${zone.pct}</p>
+                    </div>
+                    <span class="font-black text-gray-200">${zone.min} - ${zone.max} <span class="text-[10px] font-medium text-gray-500">BPM</span></span>
+                </div>
+            `).join('');
+
+            drawDashboardChart();
+        }
+
+        function drawDashboardChart() {
+            const canvas = document.getElementById('dashboard-trend-canvas');
+            const placeholder = document.getElementById('chart-no-data');
+            
+            if (state.history.length < 2) {
+                canvas.classList.add('hidden');
+                placeholder.classList.remove('hidden');
+                return;
+            }
+
+            canvas.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+
+            const logs = state.history.slice(-7);
+            const w = rect.width;
+            const h = rect.height;
+
+            const minBpm = Math.min(...logs.map(l => l.bpm)) - 10;
+            const maxBpm = Math.max(...logs.map(l => l.bpm)) + 10;
+            const range = maxBpm - minBpm || 1;
+
+            ctx.clearRect(0, 0, w, h);
+
+            // Draw grid lines
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            [60, 80, 100, 120].forEach(marker => {
+                const y = h - ((marker - minBpm) / range) * h;
+                if (y >= 0 && y <= h) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(w, y);
+                    ctx.stroke();
+                }
+            });
+
+            ctx.beginPath();
+            const points = logs.map((l, index) => {
+                const x = (index / (logs.length - 1)) * (w - 20) + 10;
+                const y = h - ((l.bpm - minBpm) / range) * (h - 20) - 10;
+                return { x, y, bpm: l.bpm };
+            });
+
+            ctx.strokeStyle = '#f43f5e';
+            ctx.lineWidth = 3.5;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            points.forEach((pt, idx) => {
+                if (idx === 0) {
+                    ctx.moveTo(pt.x, pt.y);
+                } else {
+                    const prev = points[idx - 1];
+                    const xc = (prev.x + pt.x) / 2;
+                    const yc = (prev.y + pt.y) / 2;
+                    ctx.quadraticCurveTo(prev.x, prev.y, xc, yc);
+                }
+            });
+            ctx.stroke();
+
+            // Gradient Area Fill under trendline
+            ctx.lineTo(points[points.length - 1].x, h);
+            ctx.lineTo(points[0].x, h);
+            ctx.closePath();
+            const grad = ctx.createLinearGradient(0, 0, 0, h);
+            grad.addColorStop(0, 'rgba(244, 63, 94, 0.25)');
+            grad.addColorStop(1, 'rgba(244, 63, 94, 0.0)');
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            // Draw interactive dots
+            points.forEach((pt) => {
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, 4.5, 0, Math.PI * 2);
+                ctx.fillStyle = '#151c2c';
+                ctx.fill();
+                ctx.lineWidth = 2.5;
+                ctx.strokeStyle = '#f43f5e';
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 9px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillText(pt.bpm, pt.x, pt.y - 10);
+            });
+        }
+
+        /* -----------------------
+           NEW: DYNAMIC ECG WAVEFORM SIMULATOR/VISUALIZER
+           ----------------------- */
+        // Evaluates a realistic P-Q-R-S-T heart waveform shape based on phase (0.0 to 1.0)
+        function getECGValue(t) {
+            t = t % 1.0;
+            if (t < 0.08) {
+                // P Wave: Smooth, rounded minor hump
+                return Math.sin((t / 0.08) * Math.PI) * 0.12;
+            } else if (t < 0.14) {
+                // PR Segment: Flat Isoelectric line
+                return 0;
+            } else if (t < 0.17) {
+                // Q Wave: Rapid minor downward dip
+                return -Math.sin(((t - 0.14) / 0.03) * Math.PI) * 0.08;
+            } else if (t < 0.21) {
+                // R Wave: Sharp, tall, fast positive peak
+                return Math.sin(((t - 0.17) / 0.04) * Math.PI) * 1.0;
+            } else if (t < 0.24) {
+                // S Wave: Deep, sharp downward dip right after R
+                return -Math.sin(((t - 0.21) / 0.03) * Math.PI) * 0.32;
+            } else if (t < 0.30) {
+                // ST Segment: Flat line
+                return 0;
+            } else if (t < 0.44) {
+                // T Wave: Broader, medium smooth positive bump
+                return Math.sin(((t - 0.30) / 0.14) * Math.PI) * 0.24;
+            } else {
+                // Diastolic Period: flat rest line
+                return 0;
+            }
+        }
+
+        function startDashboardECG() {
+            const canvas = el.dashboardEcgCanvas;
+            const ctx = canvas.getContext('2d');
+            
+            let lastTime = performance.now();
+            state.ecgSweepX = 0;
+
+            function animate(now) {
+                if (state.currentTab === 'dashboard') {
+                    // Adapt canvas width with high DPI support
+                    const rect = canvas.getBoundingClientRect();
+                    const dpr = window.devicePixelRatio || 1;
+                    if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
+                        canvas.width = rect.width * dpr;
+                        canvas.height = rect.height * dpr;
+                        ctx.scale(dpr, dpr);
+                        
+                        // Populate placeholder dots initially if resized
+                        state.ecgPoints = new Array(Math.ceil(rect.width)).fill(0);
+                    }
+
+                    const w = rect.width;
+                    const h = rect.height;
+                    const dt = (now - lastTime) / 1000; // time in seconds
+
+                    // Get BPM for phase calculation
+                    let currentBPM = 72;
+                    if (state.history.length > 0) {
+                        currentBPM = state.history[state.history.length - 1].bpm;
+                    }
+                    
+                    // The heart rate dictates the speed of the phase progression
+                    // One heartbeat duration (seconds) = 60 / BPM
+                    const beatDuration = 60 / currentBPM;
+                    
+                    // Increment phase based on time elapsed
+                    state.ecgPhase += dt / beatDuration;
+                    state.ecgPhase = state.ecgPhase % 1.0;
+
+                    // Compute the amplitude value (-0.32 to 1.0)
+                    const ecgVal = getECGValue(state.ecgPhase);
+
+                    // Map sweep pointer speed (constant speed across screen)
+                    // Let's make the sweep loop completely across the monitor screen every 3 seconds
+                    const sweepCycleSeconds = 3.0;
+                    const pxPerSecond = w / sweepCycleSeconds;
+                    
+                    const prevSweepX = state.ecgSweepX;
+                    state.ecgSweepX += pxPerSecond * dt;
+                    if (state.ecgSweepX >= w) {
+                        state.ecgSweepX = 0;
+                    }
+
+                    // Buffer historical points to draw a complete trace
+                    const startX = Math.floor(prevSweepX);
+                    const endX = Math.floor(state.ecgSweepX);
+
+                    if (state.ecgPoints.length !== Math.ceil(w)) {
+                        state.ecgPoints = new Array(Math.ceil(w)).fill(0);
+                    }
+
+                    // Interpolate values if the draw frame stepped across multiple pixels
+                    if (endX > startX) {
+                        for (let x = startX; x <= endX; x++) {
+                            if (x < w) state.ecgPoints[x] = ecgVal;
+                        }
+                    } else {
+                        // Wrapped around boundary
+                        for (let x = startX; x < w; x++) {
+                            state.ecgPoints[x] = ecgVal;
+                        }
+                        for (let x = 0; x <= endX; x++) {
+                            if (x < w) state.ecgPoints[x] = ecgVal;
+                        }
+                    }
+
+                    // Draw the monitor interface
+                    ctx.clearRect(0, 0, w, h);
+
+                    // 1. Draw Medical Grid Background
+                    ctx.strokeStyle = 'rgba(16, 185, 129, 0.08)'; // Emerald thin grid
+                    ctx.lineWidth = 0.5;
+                    const gridSize = 12;
+                    for (let x = 0; x < w; x += gridSize) {
+                        ctx.beginPath();
+                        ctx.moveTo(x, 0);
+                        ctx.lineTo(x, h);
+                        ctx.stroke();
+                    }
+                    for (let y = 0; y < h; y += gridSize) {
+                        ctx.beginPath();
+                        ctx.moveTo(0, y);
+                        ctx.lineTo(w, y);
+                        ctx.stroke();
+                    }
+
+                    // 2. Draw Waveform Trace (Skip drawing a small gap around the sweep head)
+                    ctx.strokeStyle = '#10b981'; // Medical Emerald glow
+                    ctx.lineWidth = 2.0;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.shadowColor = '#10b981';
+                    
+                    const gapWidth = 12; // Gap ahead of sweep line to clear old data
+                    ctx.beginPath();
+                    
+                    let first = true;
+                    for (let x = 0; x < w; x++) {
+                        // Skip rendering in the gap right after the sweep cursor
+                        const isInsideGap = (state.ecgSweepX < x && x < state.ecgSweepX + gapWidth) ||
+                                            (state.ecgSweepX + gapWidth >= w && x < (state.ecgSweepX + gapWidth) % w);
+
+                        if (isInsideGap) {
+                            first = true; // Break line path
+                            continue;
+                        }
+
+                        // Map normalized ECG amplitude to canvas height coordinates
+                        // Normal height sits around center, peak goes upwards
+                        const y = (h * 0.6) - (state.ecgPoints[x] * (h * 0.45));
+
+                        if (first) {
+                            ctx.moveTo(x, y);
+                            first = false;
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                    }
+                    
+                    ctx.shadowBlur = 8; // Glowing sweep path
+                    ctx.stroke();
+                    ctx.shadowBlur = 0; // Restore context properties
+
+                    // 3. Draw Leading Blip at the Sweep Point
+                    const currentY = (h * 0.6) - (ecgVal * (h * 0.45));
+                    ctx.beginPath();
+                    ctx.arc(state.ecgSweepX, currentY, 3.5, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.shadowColor = '#34d399';
+                    ctx.shadowBlur = 12;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+
+                lastTime = now;
+                state.ecgAnimationId = requestAnimationFrame(animate);
+            }
+
+            state.ecgAnimationId = requestAnimationFrame(animate);
+        }
+
+        /* -----------------------
+           MEASURE SCREEN NAVIGATION
+           ----------------------- */
+        function setMeasureMethod(method) {
+            if (state.isPPGMeasuring) {
+                stopPPGMeasurement(false);
+            }
+            state.measureMethod = method;
+
+            if (method === 'ppg') {
+                el.btnMethodPPG.className = "flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-300 bg-brand-500 text-white shadow-md";
+                el.btnMethodTap.className = "flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-300 text-gray-400 hover:text-white";
+                el.measurePPGContainer.classList.remove('hidden');
+                el.measureTapContainer.classList.add('hidden');
+            } else {
+                el.btnMethodPPG.className = "flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-300 text-gray-400 hover:text-white";
+                el.btnMethodTap.className = "flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-300 bg-indigo-600 text-white shadow-md";
+                el.measurePPGContainer.classList.add('hidden');
+                el.measureTapContainer.classList.remove('hidden');
+                resetTapState();
+            }
+        }
+
+        /* -----------------------
+           CAMERA PPG & FALLBACK SIMULATOR (FIXED)
+           ----------------------- */
+        function showSimulationModeChoice() {
+            el.cameraErrorModal.classList.remove('hidden');
+        }
+
+        function closeCameraErrorModal() {
+            el.cameraErrorModal.classList.add('hidden');
+        }
+
+        function startSimulationPPG() {
+            closeCameraErrorModal();
+            state.isSimulationMode = true;
+            startPPGMeasurementCore();
+        }
+
+        function switchToTapMode() {
+            closeCameraErrorModal();
+            setMeasureMethod('tap');
+        }
+
+        function startPPGMeasurement() {
+            state.isSimulationMode = false; // Real camera try by default
+            startPPGMeasurementCore();
+        }
+
+        async function startPPGMeasurementCore() {
+            initAudio();
+            // Reset state parameters
+            state.rollingRedBuffer = [];
+            state.rollingBPMBuffer = [];
+            state.ppgProgress = 0;
+            state.detectedBPM = 0;
+            state.ppgStartTime = Date.now();
+            state.lastPeakTime = 0;
+
+            // UI initial settings
+            el.ppgLiveBPM.textContent = '--';
+            el.ppgProgressRing.style.strokeDashoffset = '615.7';
+            el.ppgBtnStart.classList.add('hidden');
+            el.ppgBtnStop.classList.remove('hidden');
+            el.video.classList.remove('opacity-20');
+            el.video.classList.add('opacity-80');
+
+            // 1. Simulation Mode Flow
+            if (state.isSimulationMode) {
+                el.ppgWarning.classList.add('hidden');
+                el.ppgSignalText.textContent = '시뮬레이터 로딩...';
+                el.ppgSignalIndicator.className = 'w-2.5 h-2.5 rounded-full bg-sky-400 animate-pulse';
+                el.simulationOverlayBadge.classList.remove('hidden');
+                
+                state.isPPGMeasuring = true;
+                processPPGFrames();
+                return;
+            }
+
+            // 2. Physical Camera Active Flow
+            el.ppgSignalText.textContent = '센서 활성화 중...';
+            el.ppgSignalIndicator.className = 'w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse';
+            el.ppgWarning.classList.remove('hidden');
+            el.simulationOverlayBadge.classList.add('hidden');
+
+            // Broad range of constraint presets to minimize hardware startup errors on all devices
+            const constraintPresets = [
+                {
+                    video: {
+                        facingMode: { ideal: 'environment' },
+                        width: { ideal: 160 },
+                        height: { ideal: 120 }
+                    }
+                },
+                {
+                    video: { facingMode: 'environment' }
+                },
+                {
+                    video: { facingMode: 'user' }
+                },
+                {
+                    video: true
+                }
+            ];
+
+            let success = false;
+            let stream = null;
+
+            for (let i = 0; i < constraintPresets.length; i++) {
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia(constraintPresets[i]);
+                    success = true;
+                    break;
+                } catch (e) {
+                    console.warn(`Camera constraint option ${i} failed. Trying alternative...`, e);
+                }
+            }
+
+            if (success && stream) {
+                state.videoStream = stream;
+                el.video.srcObject = state.videoStream;
+                try {
+                    await el.video.play();
+                    state.isPPGMeasuring = true;
+                    processPPGFrames();
+
+                    // Optional Torch activation attempt on environments that allow it
+                    setTimeout(() => {
+                        try {
+                            const track = state.videoStream.getVideoTracks()[0];
+                            if (track && track.getCapabilities && track.getCapabilities().torch) {
+                                track.applyConstraints({ advanced: [{ torch: true }] });
+                            }
+                        } catch (e) {
+                            console.warn("Backlight/Torch controls unsupported on this platform.", e);
+                        }
+                    }, 800);
+                } catch (playErr) {
+                    console.error("Video play failed", playErr);
+                    stopPPGMeasurement(false);
+                    showSimulationModeChoice();
+                }
+            } else {
+                stopPPGMeasurement(false);
+                showSimulationModeChoice();
+            }
+        }
+
+        function stopPPGMeasurement(isComplete = false) {
+            state.isPPGMeasuring = false;
+            if (state.ppgAnimationId) {
+                cancelAnimationFrame(state.ppgAnimationId);
+            }
+
+            // Stream track teardown
+            if (state.videoStream) {
+                state.videoStream.getTracks().forEach(track => track.stop());
+                state.videoStream = null;
+            }
+            el.video.srcObject = null;
+
+            // Interface elements restoration
+            el.ppgBtnStart.classList.remove('hidden');
+            el.ppgBtnStop.classList.add('hidden');
+            el.video.classList.remove('opacity-85');
+            el.video.classList.add('opacity-20');
+            el.ppgWarning.classList.add('hidden');
+            el.simulationOverlayBadge.classList.add('hidden');
+
+            el.ppgRipple1.classList.add('opacity-0');
+            el.ppgRipple2.classList.add('opacity-0');
+
+            if (isComplete) {
+                el.ppgSignalText.textContent = '분석 완료';
+                el.ppgSignalIndicator.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+                
+                if (state.isSimulationMode) {
+                    showToast("가상 시뮬레이션 심박 측정이 성공적으로 완료되었습니다!");
+                }
+                
+                openSaveModal(state.detectedBPM || 75);
+            } else {
+                el.ppgSignalText.textContent = '대기';
+                el.ppgSignalIndicator.className = 'w-2.5 h-2.5 rounded-full bg-gray-600';
+                el.ppgProgressRing.style.strokeDashoffset = '615.7';
+                el.ppgLiveBPM.textContent = '--';
+            }
+
+            state.isSimulationMode = false; // Reset simulator flag
+        }
+
+        function processPPGFrames() {
+            if (!state.isPPGMeasuring) return;
+
+            const width = 160;
+            const height = 120;
+            
+            // Offscreen helper processing canvas
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = width;
+            tempCanvas.height = height;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            const canvas = el.ppgCanvas;
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+
+            function frameLoop(now) {
+                if (!state.isPPGMeasuring) return;
+
+                let avgR = 0;
+                let isFingerOnLens = false;
+
+                if (state.isSimulationMode) {
+                    // Inject a highly realistic synthetic double-peaked PPG wave
+                    const elapsedSec = (Date.now() - state.ppgStartTime) / 1000;
+                    const simulatedBPM = 72 + Math.sin(elapsedSec * 0.15) * 4; // slow respiration fluctuation
+                    const beatPeriod = 60 / simulatedBPM;
+                    const phase = ((elapsedSec % beatPeriod) / beatPeriod) * Math.PI * 2;
+
+                    // Mathematical combination of systolic and dicrotic notch peaks
+                    const wave = Math.sin(phase) * 0.75 + Math.max(0, Math.sin(phase * 2 - 1.2)) * 0.4;
+                    
+                    // Simulated color level values (Average red channel intensity shift)
+                    avgR = 170 + wave * 15;
+                    isFingerOnLens = true; // Simulators bypassing check
+                } else {
+                    // Capture pixel data from live camera stream
+                    try {
+                        tempCtx.drawImage(el.video, 0, 0, width, height);
+                    } catch (e) {
+                        state.ppgAnimationId = requestAnimationFrame(frameLoop);
+                        return;
+                    }
+
+                    const sx = Math.floor(width / 2) - 15;
+                    const sy = Math.floor(height / 2) - 15;
+                    const imgData = tempCtx.getImageData(sx, sy, 30, 30);
+                    const data = imgData.data;
+
+                    let sumRed = 0;
+                    let sumGreen = 0;
+                    let sumBlue = 0;
+                    const totalPixels = data.length / 4;
+
+                    for (let i = 0; i < data.length; i += 4) {
+                        sumRed += data[i];
+                        sumGreen += data[i + 1];
+                        sumBlue += data[i + 2];
+                    }
+
+                    const avgRVal = sumRed / totalPixels;
+                    const avgG = sumGreen / totalPixels;
+                    const avgB = sumBlue / totalPixels;
+
+                    avgR = avgRVal;
+                    // Finger detection formula: high red density with minimal blue/green values
+                    isFingerOnLens = (avgRVal > 110) && (avgRVal > (avgG + avgB) * 1.2);
+                }
+
+                if (!isFingerOnLens) {
+                    el.ppgWarning.classList.remove('hidden');
+                    el.ppgSignalText.textContent = '센서 피드백 대기...';
+                    el.ppgSignalIndicator.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse';
+                    state.ppgStartTime = Date.now(); // Postpone timer until user covers the camera lens
+                } else {
+                    el.ppgWarning.classList.add('hidden');
+                    
+                    if (state.isSimulationMode) {
+                        el.ppgSignalText.textContent = '가상 분석중...';
+                        el.ppgSignalIndicator.className = 'w-2.5 h-2.5 rounded-full bg-sky-400 animate-pulse';
+                    } else {
+                        el.ppgSignalText.textContent = '신호 수집중...';
+                        el.ppgSignalIndicator.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
+                    }
+
+                    // Progress calculation
+                    const elapsed = Date.now() - state.ppgStartTime;
+                    state.ppgProgress = Math.min(1.0, elapsed / state.ppgDuration);
+                    
+                    const ringOffset = 615.7 - (615.7 * state.ppgProgress);
+                    el.ppgProgressRing.style.strokeDashoffset = ringOffset;
+
+                    state.rollingRedBuffer.push(avgR);
+                    if (state.rollingRedBuffer.length > 150) {
+                        state.rollingRedBuffer.shift();
+                    }
+
+                    // Bandpass Filtering for wave smoothing
+                    const smoothedSignal = computeSmoothedPPGSignal(state.rollingRedBuffer);
+                    
+                    renderLivePPGWave(ctx, rect.width, rect.height, smoothedSignal);
+
+                    // Core algorithm peak detection
+                    detectBPMFromPPG(smoothedSignal, now);
+
+                    if (state.ppgProgress >= 1.0) {
+                        stopPPGMeasurement(true);
+                        return;
+                    }
+                }
+
+                state.ppgAnimationId = requestAnimationFrame(frameLoop);
+            }
+
+            state.ppgAnimationId = requestAnimationFrame(frameLoop);
+        }
+
+        // Apply a high-pass / low-pass smoothing filter to detrend blood volume changes
+        function computeSmoothedPPGSignal(rawBuffer) {
+            if (rawBuffer.length < 5) return rawBuffer.map(() => 0);
+            
+            const smoothed = [];
+            for (let i = 0; i < rawBuffer.length; i++) {
+                const start = Math.max(0, i - 2);
+                const end = Math.min(rawBuffer.length - 1, i + 2);
+                let sum = 0;
+                for (let j = start; j <= end; j++) sum += rawBuffer[j];
+                smoothed.push(sum / (end - start + 1));
+            }
+
+            const slowTrend = [];
+            const trendWindow = 25;
+            for (let i = 0; i < smoothed.length; i++) {
+                const start = Math.max(0, i - trendWindow);
+                const end = Math.min(smoothed.length - 1, i + trendWindow);
+                let sum = 0;
+                for (let j = start; j <= end; j++) sum += rawBuffer[j] || 0; // Prevent undefined errors
+                slowTrend.push(sum / (end - start + 1));
+            }
+
+            const detrended = smoothed.map((v, idx) => v - slowTrend[idx]);
+            return detrended;
+        }
+
+        function renderLivePPGWave(ctx, w, h, signal) {
+            ctx.clearRect(0, 0, w, h);
+
+            if (signal.length < 2) return;
+
+            let maxVal = Math.max(...signal);
+            let minVal = Math.min(...signal);
+            let valRange = maxVal - minVal || 1;
+
+            ctx.beginPath();
+            ctx.strokeStyle = state.isSimulationMode ? '#0ea5e9' : '#f43f5e';
+            ctx.lineWidth = 2.5;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            for (let i = 0; i < signal.length; i++) {
+                const x = (i / 150) * w;
+                const y = h/2 - (signal[i] / valRange) * (h * 0.7);
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.stroke();
+
+            // Render live pulsing glow node
+            const lastIdx = signal.length - 1;
+            const pulseX = (lastIdx / 150) * w;
+            const pulseY = h/2 - (signal[lastIdx] / valRange) * (h * 0.7);
+
+            ctx.beginPath();
+            ctx.arc(pulseX, pulseY, 5, 0, Math.PI * 2);
+            ctx.fillStyle = state.isSimulationMode ? '#0ea5e9' : '#f43f5e';
+            ctx.shadowColor = state.isSimulationMode ? '#0ea5e9' : '#f43f5e';
+            ctx.shadowBlur = 10;
+            ctx.fill();
+            ctx.shadowBlur = 0; 
+        }
+
+        function detectBPMFromPPG(signal, now) {
+            if (signal.length < 20) return;
+
+            const idx = signal.length - 2; 
+            const prev = signal[idx - 1];
+            const curr = signal[idx];
+            const next = signal[idx + 1];
+
+            if (curr > prev && curr > next) {
+                let localMax = Math.max(...signal);
+                let localMin = Math.min(...signal);
+                const amp = localMax - localMin;
+
+                if (curr > (localMax * 0.1) && (now - state.lastPeakTime > 320)) { 
+                    if (state.lastPeakTime > 0) {
+                        const pulseIntervalMs = now - state.lastPeakTime;
+                        const instantBPM = Math.round(60000 / pulseIntervalMs);
+
+                        if (instantBPM >= 45 && instantBPM <= 160) {
+                            state.rollingBPMBuffer.push(instantBPM);
+                            if (state.rollingBPMBuffer.length > 6) {
+                                state.rollingBPMBuffer.shift();
+                            }
+
+                            const sum = state.rollingBPMBuffer.reduce((a, b) => a + b, 0);
+                            state.detectedBPM = Math.round(sum / state.rollingBPMBuffer.length);
+                            
+                            el.ppgLiveBPM.textContent = state.detectedBPM;
+                            triggerPulseFeedback();
+                        }
+                    }
+                    state.lastPeakTime = now;
+                }
+            }
+        }
+
+        function triggerPulseFeedback() {
+            playHeartbeatSound();
+
+            el.ppgRipple1.classList.remove('scale-100', 'opacity-0');
+            el.ppgRipple1.classList.add('scale-125', 'opacity-100');
+            
+            el.ppgPulseCircle.classList.add('scale-110', 'bg-brand-500/50');
+
+            setTimeout(() => {
+                el.ppgRipple1.classList.add('scale-100', 'opacity-0');
+                el.ppgRipple1.classList.remove('scale-125', 'opacity-100');
+                el.ppgPulseCircle.classList.remove('scale-110', 'bg-brand-500/50');
+            }, 300);
+        }
+
+        /* -----------------------
+           MANUAL TAP PULSE LOGIC
+           ----------------------- */
+        function resetTapState() {
+            state.tapTimestamps = [];
+            state.tapBPM = 0;
+            el.tapCountLabel.textContent = "0회 터치됨";
+            el.tapCalculatedBPM.textContent = "--";
+            el.tapBtnSave.disabled = true;
+        }
+
+        el.tapPad.addEventListener('mousedown', registerTapPulse);
+        el.tapPad.addEventListener('touchstart', (e) => {
+            e.preventDefault(); 
+            registerTapPulse();
+        });
+
+        function registerTapPulse() {
+            initAudio();
+            playBeep(220, 0.08, 'triangle');
+            
+            const now = Date.now();
+            state.tapTimestamps.push(now);
+
+            if (state.tapTimestamps.length > 10) {
+                state.tapTimestamps.shift();
+            }
+
+            el.tapCountLabel.textContent = `${state.tapTimestamps.length}회 터치됨`;
+
+            if (state.tapTimestamps.length >= 2) {
+                let totalDiff = 0;
+                for (let i = 1; i < state.tapTimestamps.length; i++) {
+                    totalDiff += (state.tapTimestamps[i] - state.tapTimestamps[i - 1]);
+                }
+                const avgInterval = totalDiff / (state.tapTimestamps.length - 1);
+                state.tapBPM = Math.round(60000 / avgInterval);
+
+                if (state.tapBPM >= 40 && state.tapBPM <= 200) {
+                    el.tapCalculatedBPM.textContent = state.tapBPM;
+                    el.tapBtnSave.disabled = (state.tapTimestamps.length < 4); 
+                } else {
+                    el.tapCalculatedBPM.textContent = "범위 초과";
+                    el.tapBtnSave.disabled = true;
+                }
+            }
+        }
+
+        function saveTapMeasurement() {
+            if (state.tapBPM > 0) {
+                openSaveModal(state.tapBPM);
+            }
+        }
+
+        /* -----------------------
+           SAVE LOGS MANAGEMENT & DATABASE
+           ----------------------- */
+        function openSaveModal(bpm) {
+            state.tempMeasuredBPM = bpm;
+            document.getElementById('save-modal-bpm').textContent = bpm;
+            setSelectedTag('resting'); 
+            el.saveModal.classList.remove('hidden');
+        }
+
+        function closeSaveModal() {
+            el.saveModal.classList.add('hidden');
+        }
+
+        function setSelectedTag(tag) {
+            state.selectedSaveTag = tag;
+            ['resting', 'active', 'excited'].forEach(t => {
+                const button = document.getElementById(`tag-btn-${t}`);
+                if (t === tag) {
+                    button.className = "py-2.5 rounded-xl text-xs font-semibold bg-brand-500 text-white border border-brand-500/20 transition";
+                } else {
+                    button.className = "py-2.5 rounded-xl text-xs font-semibold bg-gray-800 text-gray-400 border border-gray-800 hover:text-white transition";
+                }
+            });
+        }
+
+        function submitMeasurementLog() {
+            const newLog = {
+                id: Date.now(),
+                bpm: state.tempMeasuredBPM,
+                tag: state.selectedSaveTag,
+                date: new Date().toISOString()
+            };
+
+            state.history.push(newLog);
+            localStorage.setItem('pulse_history', JSON.stringify(state.history));
+            
+            closeSaveModal();
+            showToast("심박 데이터 기록이 저장되었습니다!");
+            resetTapState();
+            switchTab('dashboard');
+        }
+
+        function clearAllHistory() {
+            const confirmState = confirm("정말로 모든 심박 저장 기록을 완전 삭제하시겠습니까?");
+            if (confirmState) {
+                state.history = [];
+                localStorage.setItem('pulse_history', JSON.stringify([]));
+                updateHistoryUI();
+                showToast("기록이 모두 영구 삭제되었습니다.", false);
+            }
+        }
+
+        function filterLogs(filterType) {
+            ['all', 'resting', 'active'].forEach(f => {
+                const btn = document.getElementById(`btn-filter-${f}`);
+                if (f === filterType) {
+                    btn.className = "flex-1 py-1.5 rounded-lg font-bold bg-gray-800 text-white transition";
+                } else {
+                    btn.className = "flex-1 py-1.5 rounded-lg font-bold text-gray-400 hover:text-white transition";
+                }
+            });
+
+            updateHistoryUI(filterType);
+        }
+
+        function updateHistoryUI(filterType = 'all') {
+            const logs = [...state.history].reverse();
+            const container = el.logsContainer;
+            
+            const filteredLogs = logs.filter(log => {
+                if (filterType === 'all') return true;
+                return log.tag === filterType;
+            });
+
+            if (filteredLogs.length === 0) {
+                container.innerHTML = `
+                    <div class="p-8 text-center text-gray-500 text-xs">
+                        <i class="fa-solid fa-notes-medical text-3xl mb-2 text-gray-600 block"></i>
+                        표시할 심박 측정 기록이 없습니다.
+                    </div>
+                `;
+            } else {
+                container.innerHTML = filteredLogs.map(log => {
+                    let tagClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+                    let tagIcon = "fa-bed";
+                    let tagText = "안정기 (휴식)";
+                    
+                    if (log.tag === 'active') {
+                        tagClass = "bg-rose-500/10 text-rose-400 border-rose-500/20";
+                        tagIcon = "fa-person-running";
+                        tagText = "운동 직후";
+                    } else if (log.tag === 'excited') {
+                        tagClass = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+                        tagIcon = "fa-bolt";
+                        tagText = "흥분/스트레스";
+                    }
+
+                    const dateStr = new Date(log.date).toLocaleString('ko-KR', {
+                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                    });
+
+                    return `
+                        <div class="flex items-center justify-between p-4 rounded-2xl bg-cardBg border border-gray-800 hover:border-gray-700 transition">
+                            <div class="flex items-center gap-3">
+                                <div class="w-11 h-11 rounded-xl bg-gray-900 border border-gray-800 flex items-center justify-center">
+                                    <span class="text-xl font-extrabold text-white">${log.bpm}</span>
+                                </div>
+                                <div class="space-y-0.5">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="text-[10px] font-extrabold tracking-wide uppercase px-2 py-0.5 rounded border ${tagClass}">
+                                            <i class="fa-solid ${tagIcon} mr-0.5"></i>${tagText}
+                                        </span>
+                                    </div>
+                                    <p class="text-[10px] text-gray-500">${dateStr}</p>
+                                </div>
+                            </div>
+                            <button onclick="deleteLog(${log.id})" class="w-7 h-7 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-500 hover:text-rose-400 flex items-center justify-center transition">
+                                <i class="fa-regular fa-trash-can text-xs"></i>
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            drawHistoryChart();
+        }
+
+        function deleteLog(id) {
+            state.history = state.history.filter(log => log.id !== id);
+            localStorage.setItem('pulse_history', JSON.stringify(state.history));
+            updateHistoryUI();
+            showToast("기록이 성공적으로 삭제되었습니다.", false);
+        }
+
+        function drawHistoryChart() {
+            const canvas = document.getElementById('history-bar-canvas');
+            const fallback = document.getElementById('history-chart-fallback');
+
+            if (state.history.length < 3) {
+                canvas.classList.add('hidden');
+                fallback.classList.remove('hidden');
+                return;
+            }
+
+            canvas.classList.remove('hidden');
+            fallback.classList.add('hidden');
+
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+
+            const logs = state.history.slice(-7);
+            const w = rect.width;
+            const h = rect.height;
+
+            const maxBpm = Math.max(...logs.map(l => l.bpm));
+            const maxVal = maxBpm + 10;
+
+            ctx.clearRect(0, 0, w, h);
+
+            const barWidth = 24;
+            const gap = (w - (barWidth * logs.length)) / (logs.length + 1);
+
+            logs.forEach((log, index) => {
+                const barHeight = (log.bpm / maxVal) * (h - 25);
+                const x = gap + index * (barWidth + gap);
+                const y = h - barHeight - 15;
+
+                ctx.beginPath();
+                ctx.fillStyle = log.tag === 'active' ? '#f43f5e' : log.tag === 'excited' ? '#f59e0b' : '#10b981';
+                
+                ctx.moveTo(x, y + 5);
+                ctx.quadraticCurveTo(x, y, x + 5, y);
+                ctx.lineTo(x + barWidth - 5, y);
+                ctx.quadraticCurveTo(x + barWidth, y, x + barWidth, y + 5);
+                ctx.lineTo(x + barWidth, h - 15);
+                ctx.lineTo(x, h - 15);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = '#f3f4f6';
+                ctx.font = 'bold 9px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillText(log.bpm, x + barWidth / 2, y - 5);
+
+                ctx.fillStyle = '#6b7280';
+                ctx.font = '7px Inter';
+                ctx.fillText(`#${index + 1}`, x + barWidth / 2, h - 3);
+            });
+        }
+
+        /* -----------------------
+           MINDFULNESS BREATH TRAINER
+           ----------------------- */
+        const breathPresetsConfig = {
+            box: {
+                title: '박스 브리딩 (Box Breathing)',
+                desc: '의식적인 이완 및 각성 조절에 최고인 4초 주기 사각 훈련입니다.',
+                cycle: [
+                    { state: 'inhale', text: '숨 들이마시기', duration: 4, size: 'scale-150 bg-sky-500/40' },
+                    { state: 'hold1', text: '숨 참고 멈추기', duration: 4, size: 'scale-150 bg-sky-500/20' },
+                    { state: 'exhale', text: '숨 천천히 내쉬기', duration: 4, size: 'scale-90 bg-sky-600/10' },
+                    { state: 'hold2', text: '숨 비우고 멈추기', duration: 4, size: 'scale-90 bg-indigo-950/20' }
+                ]
+            },
+            calm: {
+                title: '4-7-8 숙면 호흡법 (Calm Sleep)',
+                desc: '불면증 극복 및 마음 이완 촉진을 위한 하버드 의대 웰 박사 개발 호흡 주법입니다.',
+                cycle: [
+                    { state: 'inhale', text: '코로 가볍게 흡입', duration: 4, size: 'scale-150 bg-sky-500/40' },
+                    { state: 'hold1', text: '머금고 정지', duration: 7, size: 'scale-150 bg-sky-500/20' },
+                    { state: 'exhale', text: '입으로 내쉬기', duration: 8, size: 'scale-75 bg-sky-600/10' }
+                ]
+            },
+            equal: {
+                title: '균등 정화 호흡 (Equal Breathing)',
+                desc: '호흡량 평형 상태 유지를 통한 폐활량 회복 및 맥박 균형 조절입니다.',
+                cycle: [
+                    { state: 'inhale', text: '들이 마시고', duration: 5, size: 'scale-150 bg-sky-500/40' },
+                    { state: 'exhale', text: '내 쉬고', duration: 5, size: 'scale-90 bg-sky-600/10' }
+                ]
+            }
+        };
+
+        function setBreathPreset(presetKey) {
+            stopBreathTrainer();
+            state.breathPreset = presetKey;
+
+            ['box', 'calm', 'equal'].forEach(p => {
+                const btn = document.getElementById(`btn-breath-${p}`);
+                if (p === presetKey) {
+                    btn.className = "py-2.5 px-2 rounded-xl text-xs font-bold bg-sky-500 text-white transition";
+                } else {
+                    btn.className = "py-2.5 px-2 rounded-xl text-xs font-bold bg-gray-800 text-gray-400 hover:text-white transition";
+                }
+            });
+
+            const config = breathPresetsConfig[presetKey];
+            document.getElementById('breath-preset-title').textContent = config.title;
+            document.getElementById('breath-preset-desc').textContent = config.desc;
+        }
+
+        function toggleBreathTrainer() {
+            if (state.breathState !== 'idle') {
+                stopBreathTrainer();
+            } else {
+                startBreathTrainer();
+            }
+        }
+
+        function startBreathTrainer() {
+            initAudio();
+            const config = breathPresetsConfig[state.breathPreset];
+            let currentStepIndex = 0;
+            
+            document.getElementById('btn-breath-control').innerHTML = `<i class="fa-solid fa-stop mr-1"></i>호흡 운동 멈추기`;
+            document.getElementById('btn-breath-control').className = "w-full py-4 rounded-2xl bg-gray-800 hover:bg-gray-700 font-bold text-sm text-gray-200 border border-gray-700 transition flex items-center justify-center gap-2";
+
+            function runBreathStep() {
+                const step = config.cycle[currentStepIndex];
+                state.breathState = step.state;
+                state.breathTimerVal = step.duration;
+
+                document.getElementById('breath-text').textContent = step.text;
+                document.getElementById('breath-timer').textContent = `${state.breathTimerVal} 초`;
+
+                const circle = document.getElementById('breath-circle');
+                circle.className = `w-36 h-36 rounded-full border-2 border-sky-400 shadow-neon-green flex flex-col items-center justify-center transition-all duration-[${step.duration * 1000}ms] ease-in-out ${step.size}`;
+
+                if (step.state === 'inhale') {
+                    playBeep(329.63, 0.4, 'triangle'); 
+                } else if (step.state === 'exhale') {
+                    playBeep(261.63, 0.5, 'sine'); 
+                } else {
+                    playBeep(196.00, 0.3, 'sine'); 
+                }
+
+                if (state.breathInterval) clearInterval(state.breathInterval);
+                state.breathInterval = setInterval(() => {
+                    state.breathTimerVal--;
+                    if (state.breathTimerVal > 0) {
+                        document.getElementById('breath-timer').textContent = `${state.breathTimerVal} 초`;
+                        playBeep(440, 0.02, 'sine');
+                    } else {
+                        clearInterval(state.breathInterval);
+                        currentStepIndex = (currentStepIndex + 1) % config.cycle.length;
+                        runBreathStep();
+                    }
+                }, 1000);
+            }
+
+            runBreathStep();
+        }
+
+        function stopBreathTrainer() {
+            if (state.breathInterval) {
+                clearInterval(state.breathInterval);
+                state.breathInterval = null;
+            }
+            state.breathState = 'idle';
+            
+            document.getElementById('breath-text').textContent = '시작 대기';
+            document.getElementById('breath-timer').textContent = '-- 초';
+            document.getElementById('breath-circle').className = "w-36 h-36 rounded-full bg-gradient-to-tr from-sky-500/40 via-sky-400/20 to-teal-500/10 border-2 border-sky-400 shadow-neon-green flex flex-col items-center justify-center transition-all duration-300 scale-100";
+
+            document.getElementById('btn-breath-control').innerHTML = `<i class="fa-solid fa-play mr-1"></i>호흡 운동 시작하기`;
+            document.getElementById('btn-breath-control').className = "w-full py-4 rounded-2xl bg-sky-500 hover:bg-sky-600 font-bold text-sm text-white transition shadow-lg flex items-center justify-center gap-2";
+        }
+
+        /* -----------------------
+           HEALTH INSIGHTS RENDER
+           ----------------------- */
+        function renderInsights() {
+            const hrmax = 220 - state.user.age;
+            document.getElementById('insights-hrmax').textContent = `${hrmax} BPM`;
+        }
+
+        /* -----------------------
+           INITIALIZATION TRIGGER ON LOAD
+           ----------------------- */
+        window.onload = function() {
+            initLocalStorage();
+            switchTab('dashboard'); 
+        };
+    </script>
+</body>
+</html>
